@@ -1,5 +1,19 @@
-# present menu to user
+import sqlite3
 
+# connect or create database
+db = sqlite3.connect('/data/bookbox_db')
+
+# initiate cursor
+cursor = db.cursor()
+
+# create database
+cursor.execute('''
+    CREATE TABLE student(id INTEGER PRIMARY KEY, name TEXT,
+                   	grade INTEGER)
+''')
+db.commit()
+
+# present menu to user
 selection = ''
 
 # run the menu loop until '0' selected
