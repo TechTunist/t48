@@ -1,3 +1,10 @@
+"""Database Management System for Bookstore
+
+- Implements CRUD functionality
+- Utilises NLP to provide search characteristics for database entries.
+- see requirements.txt for dependencies"""
+
+
 import sqlite3 # database
 import spacy # NLP for processing user input and comparing against database
 
@@ -13,8 +20,8 @@ cursor = db.cursor()
 # get the min and max id's to let user know bounds of search
 def id_range():
     # get the max id so it can be incremented by one for each new book
-    max_id = cursor.execute('''SELECT MAX(id) FROM books''').fetchone()[0]
     min_id = cursor.execute('''SELECT MIN(id) FROM books''').fetchone()[0]
+    max_id = cursor.execute('''SELECT MAX(id) FROM books''').fetchone()[0]
     
     return min_id, max_id
 
@@ -39,7 +46,8 @@ def main_menu():
             add_book()
             
         elif selection == '2':
-            pass
+            update_book()
+
         elif selection == '3':
          delete_book()
 
@@ -56,7 +64,7 @@ def main_menu():
 def predict(query_result, search_term):
     
     # initiate the language model as nlp
-    nlp = spacy.load('en_core_web_sm')
+    nlp = spacy.load('en_core_web_md')
 
     # create a list of titles
     query_list = [i[0] for i in query_result]
@@ -77,7 +85,7 @@ def predict(query_result, search_term):
 
     # return the title with the highest similarity score to pass to the SQL query
     suggested = max(score, key=score.get)
-    print(suggested)
+    print(f"Search returning results for: {suggested}")
     
     return suggested
 
@@ -98,10 +106,10 @@ def parse_record(tuple_record):
     else:
         for tup in tuple_record:
             print(f"""
-            ID:\t\t{str(tup[0])}
+            ID:\t\t\t{str(tup[0])}
             TITLE:\t\t{tup[1]}
             AUTHOR:\t\t{tup[2]}
-            QUNTITY:\t{str(tup[3])}""")
+            QUNTITY:\t\t{str(tup[3])}""")
             
 
 # create search function
@@ -112,12 +120,12 @@ def search():
     while selection != '0':
         # choose how to search for a book
         selection = input(
-            """Choose your search parameter: \n
+            """\nChoose your search parameter: \n
             1 - select by id
             2 - select by title
             3 - select by author
             4 - show all books
-            0 - exit\n""")
+            0 - exit to main menu\n""")
 
         if selection == '1':
             
@@ -125,37 +133,47 @@ def search():
             min_id, max_id = id_range()
             
             # print acceptable id numbers
-            print(f"\nMax ID: {max_id}\n\nMin ID: {min_id}\n")
+            print(f"\nMin ID: {min_id}\n\nMax ID: {max_id}\n")
 
-            # get selection of id from the user
-            book_id = input("\nEnter the id of the book you wish to edit: \n")
+            # ensure user enters an integer for id
+            while True:
+                try:
+                    # get selection of id from the user
+                    book_id = int(input("\nEnter the id of the book you are searching for, or '0' for main menu: \n"))
 
-            # check input within acceptable parameters
-            while int(book_id) < min_id or int(book_id) > max_id:
-                print("\nINPUT NOT WITHIN BOUNDS\n")
-                
-                # print max / min ID
-                id_range()
-                
-                book_id = input("\nEnter the id of the book you are searching for: \n")
+                    if book_id == 0:
+                        return
+                except ValueError:
+                    print(f"\nYou have to enter an integer\n")
+                    continue
+                else:
+                    # main menu if 0 selected
+                    if book_id == '0':
+                        return
 
-                if book_id == '0':
-                    break
+                    # check input within acceptable parameters
+                    while int(book_id) < min_id or int(book_id) > max_id:
+                        print("\nINPUT NOT WITHIN BOUNDS\n")
+                        
+                        # print acceptable id numbers
+                        print(f"\nMin ID: {min_id}\n\nMax ID: {max_id}\n")
+                        
+                        book_id = input("\nEnter the id of the book you are searching for, or '0' for main menu: \n")
 
-            # get the book record with the chosen id
-            result = cursor.execute(
-                f"""
-                SELECT * FROM books WHERE id = ?""", (book_id,)).fetchone()
+                        if book_id == '0':
+                            return
 
-            # print the result of the query
-            parse_record(result)
+                    # get the book record with the chosen id
+                    result = cursor.execute(
+                        f"""
+                        SELECT * FROM books WHERE id = ?""", (book_id,)).fetchone()
 
-            ##########  WHAT DO I WANT TO RETURN ???? #######
-            return result
+                    # print the result of the query in nice formatting
+                    parse_record(result)
 
-
+        # search by title search
         elif selection == '2':
-            target_title = input("\nEnter the title of the book: \n")
+            target_title = input("\nSearch by the title of the book: \n")
             # use NLP to check similarity between a book title given by user and book titles in the database
 
             # get list of tuples of all titles in database
@@ -171,12 +189,10 @@ def search():
                 f"""
                 SELECT * FROM books WHERE title = ?""", (suggested,)).fetchone()
 
+            # print the result in nice formatting
             parse_record(result)
 
-            ##########  WHAT DO I WANT TO RETURN ???? #######
-            return result
-
-
+        # search by author name
         elif selection == '3':
             target_author = input("\nEnter the name of the author: \n")
 
@@ -193,9 +209,9 @@ def search():
                 f"""
                 SELECT * FROM books WHERE author = ?""", (suggested,)).fetchall()
             
+            # print result in nice formatting
             parse_record(result)
             
-            return result
             
         elif selection == '4':
             # get list of tuples of all books in database
@@ -203,19 +219,19 @@ def search():
                 """
                 SELECT * FROM books""").fetchall() # list of tuples - eg. [(name,), (next_name,),...]
             
+            # print all books in nice formatting
             parse_record(all_books_tuples)
 
-
+        # exit search menu
         elif selection == '0':
             print("\nExiting search\n")
+        
+        # print error message if selection not acceptable
         else:
             print("\n\nSelection not recognised\n")
 
 
-# create INSERT INTO functionality
-# increment id field (primary key) by one
-
-# function takes the current max id as input
+# function to add a new book into database
 def add_book():
     
     # get the max id so it can be incremented by one for each new book
@@ -223,110 +239,286 @@ def add_book():
     max_id = cursor.execute('''SELECT MAX(id) FROM books''').fetchone()[0]
     max_id += 1
 
-    title = input("\nEnter the title of the book you wish to enter into the database: \n")
-    author = input("\nEnter the name of the author: \n")
+    title = ''
+    author = ''
+    # deal with null entries
+    while title == '':
+        title = input("\nEnter the title of the book you wish to enter into the database. It cannot be left blank: (type 0 for main menu) \n")
 
-    try:
-        qty = int(input("\nEnter the number of copies of the book we have in stock: \n"))
-    except ValueError:
-        print("\nENTRY FAILED\n\nRemember that the number of copies has to be an integer!\n\n")
-        
-        return
+        # exit to main menu
+        if title == '0':
+            return
 
-    # Insert book into database
-    cursor.execute('''INSERT INTO books(id, title, author, qty)
-                      VALUES(?,?,?,?)''', (max_id, title, author, qty))
+    while author == '':
+        author = input("\nEnter the name of the author. It cannot be left blank: (type 0 for main menu)\n")
+        if author == '0':
+            return
 
-    print('\nNew book inserted')
+    # check entry is integer
+    while True:
+        try:
+            qty = int(input("\nEnter the number of copies of the book we have in stock: \n"))
+        except ValueError:
+            print("\nENTRY FAILED\n\nRemember that the number of copies has to be an integer!\n\n")
+            continue
+        else:
+                # Insert book into database
+            cursor.execute('''INSERT INTO books(id, title, author, qty)
+                            VALUES(?,?,?,?)''', (max_id, title, author, qty))
+
+            print('\nNew book inserted')
+            break
+    
+    # save changes to database
+    db.commit()
 
 
-# function to delete book
+# function to delete book by specific id number
 def delete_book():
+
+    # get min and max id
+    min_id, max_id = id_range()
     
-    # get the target id of the book to be deleted
-    target = input("\nEnter the ID of the book you wish to delete: \n")
+    # prompt user for input while until integer provided
+    while True:
+        try:
+            # get the target id of the book to be deleted
+            target = int(input("\nEnter the ID of the book you wish to delete, or '0' for main menu: \n"))
+
+            # exit to main menu if '0' input
+            if target == 0:
+                return
+        except ValueError:
+            print("\nINPUT NOT RECOGNISED\n\nPlease enter an integer\n")
+            continue
+        else:
+            # if a record exists with target ID
+            if target < min_id or target > max_id:
+                print(f"\nThe selected ID {target} does not exist in the database")
+                continue
+
+            else:
+                # user to confirm correct record selected
+                # show the selected record to user for comfirmation
+                parse_record(
+                    cursor.execute(
+                    f"""
+                    SELECT * FROM books WHERE id = ?""", (target,)))
+
+                # user confirm correct record selected
+                confirm = input("\nIs this the record you wish to delete?\nType 'yes' to make confirm, 'no' to change the ID number, or 0 to exit: \n")
+
+                # exit to main menu
+                if confirm == '0':
+                    return
+
+                elif confirm.lower() == 'yes':
+                    # execute the delete query
+                    cursor.execute(
+                    f"""
+                    DELETE FROM books WHERE id = ?""", (target,))
+                    
+                    # check book as been deleted
+                    check_delete = cursor.execute(
+                    f"""
+                    SELECT id FROM books WHERE id = ?""", (target,)).fetchone()
+
+                    if check_delete == None:
+                        # print message that book jas been successfully deleted
+                        print("DELETE SUCCESSFUL")
+                        # save changes to database
+                        db.commit()
+                    else:
+                        print("\nSomething has gone wrong, check the database to check.\n")
+            
+                elif confirm.lower() == 'no':
+                    continue
+            break
     
-    cursor.execute(
-    f"""
-    DELETE FROM books WHERE id = ?""", (target,))
-    
-    # print message that book jas been successfully deleted
-    
-    print("DELETE SUCCESSFUL")
-    
+
+# function to update title, author or quantity
+def update_book():
+
+    # get the min and max id numbers
+    min, max = id_range()
+
+    # prompt user for id number of book until acceptable input received
+    while True:
+        try:
+            # get the target id of the book to be deleted
+            target = int(input("\nEnter the ID of the book you wish to update, or '0' for main menu: \n"))
+        except ValueError:
+            print("\nINPUT NOT RECOGNISED\n\nPlease enter an integer\n")
+            continue
+
+        # exit to main menu
+        if target == 0:
+            return
+
+        # check input is between min and max ID numbers in database
+        elif target > max or target < min:
+            print("\nID NOT FOUND IN DATABASE\n")
+            continue
+
+        # execute update
+        else:
+            # show the selected record to user for comfirmation
+            parse_record(
+                cursor.execute(
+                f"""
+                SELECT * FROM books WHERE id = ?""", (target,)))
+
+            # user confirm correct record selected
+            confirm = input("\nIs this the record you wish to update?\nType 'yes' to make changes, 'no' to change the ID number, or 0 to exit: \n")
+
+            # exit loop
+            if confirm == '0':
+                break
+
+            # execute update query
+            elif confirm.lower() == 'yes':
+
+                # ask user to confirm which field to update
+                selection = input(
+                """\nChoose the field to update: \n
+                1 - title
+                2 - author
+                3 - quantity\n""")
+
+                # update title
+                if selection == '1':
+                    new_title = input("\nEnter the new tile: \n")
+                    # execute the update query at the target id
+                    cursor.execute(
+                    f"""
+                    UPDATE books
+                    SET title = ?
+                    WHERE id = ?""", (new_title, target))
+                    db.commit()
+                    return
+
+                # update author
+                elif selection == '2':
+                    new_author = input("\nEnter new author: \n")
+                    # execute the update query at the target id
+                    cursor.execute(
+                    f"""
+                    UPDATE books
+                    SET author = ?
+                    WHERE id = ?""", (new_author, target))
+                    db.commit()
+                    return
+
+                # update quantity
+                elif selection == '3':
+
+                    # prompt user for int until acceptable input received
+                    while True:
+                        try:
+                            # get the target id of the book to be deleted
+                            new_quantity = int(input("\nEnter the new quantity: \n"))
+                        except ValueError:
+                            print("\nINPUT NOT RECOGNISED\n\nPlease enter an integer\n")
+                            continue
+                        else:
+                            # execute the update query at the target id
+                            cursor.execute(
+                            f"""
+                            UPDATE books
+                            SET qty = ?
+                            WHERE id = ?""", (new_quantity, target))
+                            db.commit()
+                        return
+
+            elif confirm.lower() == 'no':
+                continue
+            else:
+                print("\nINPUT NOT RECOGNISED\n")
+                continue
+        
 
 ###############################################################################
 
 # connect or create database
-db = sqlite3.connect('bookbox_jupyter_db')
+db = sqlite3.connect('ebookstore')
 
 # initiate cursor
 cursor = db.cursor()
 
-# create database
-# cursor.execute('''
-#     CREATE TABLE student(id INTEGER PRIMARY KEY, name TEXT,
-#                    	grade INTEGER)
-# ''')
-# db.commit()
+# catch database already exists error
+try:
+    # create database
+    cursor.execute('''
+        CREATE TABLE books(id INTEGER PRIMARY KEY, title CHAR(30), author CHAR(30),
+                    qty INTEGER(5))
+    ''')
+    db.commit()
+except sqlite3.OperationalError:
+    print("\nThe Database for the task already exists\n")
 
 
 ######################### ADD BOOKS TO DATABASE ########################################
-# id1 = 3001
-# title1 = 'A Tale of Two Cities'
-# author1 = 'Charles Dickens'
-# qty1 = 30
+# catch sqlite3 integrity error
 
-# # Insert book 1
-# cursor.execute('''INSERT INTO books(id, title, author, qty)
-#                   VALUES(?,?,?,?)''', (id1, title1, author1, qty1))
-# print('First book inserted')
+try:
+    id1 = 3001
+    title1 = 'A Tale of Two Cities'
+    author1 = 'Charles Dickens'
+    qty1 = 30
 
-# id2 = 3002
-# title2 = "Harry Potter and the Philospher's Stone"
-# author2 = 'J.K. Rowling'
-# qty2 = 40
+    # Insert book 1
+    cursor.execute('''INSERT INTO books(id, title, author, qty)
+                    VALUES(?,?,?,?)''', (id1, title1, author1, qty1))
+    print('First book inserted')
 
-# # Insert book 2
-# cursor.execute('''INSERT INTO books(id, title, author, qty)
-#                   VALUES(?,?,?,?)''', (id2, title2, author2, qty2))
-# print('Second book inserted')
+    id2 = 3002
+    title2 = "Harry Potter and the Philospher's Stone"
+    author2 = 'J.K. Rowling'
+    qty2 = 40
 
-# id3 = 3003
-# title3 = "The Lion, the Witch and the Wardrobe"
-# author3 = 'C.S. Lewis'
-# qty3 = 25
+    # Insert book 2
+    cursor.execute('''INSERT INTO books(id, title, author, qty)
+                    VALUES(?,?,?,?)''', (id2, title2, author2, qty2))
+    print('Second book inserted')
 
-# # Insert book 3
-# cursor.execute('''INSERT INTO books(id, title, author, qty)
-#                   VALUES(?,?,?,?)''', (id3, title3, author3, qty3))
-# print('Third book inserted')
+    id3 = 3003
+    title3 = "The Lion, the Witch and the Wardrobe"
+    author3 = 'C.S. Lewis'
+    qty3 = 25
 
-# id4 = 3004
-# title4 = "The Lord of the Rings"
-# author4 = 'J.J.R Tolkein'
-# qty4 = 37
+    # Insert book 3
+    cursor.execute('''INSERT INTO books(id, title, author, qty)
+                    VALUES(?,?,?,?)''', (id3, title3, author3, qty3))
+    print('Third book inserted')
 
-# # Insert book 4
-# cursor.execute('''INSERT INTO books(id, title, author, qty)
-#                   VALUES(?,?,?,?)''', (id4, title4, author4, qty4))
-# print('Fourth book inserted')
+    id4 = 3004
+    title4 = "The Lord of the Rings"
+    author4 = 'J.J.R Tolkein'
+    qty4 = 37
 
-# id5 = 3005
-# title5 = "Alice in Wonderland"
-# author5 = 'Lewis Carrol'
-# qty5 = 12
+    # Insert book 4
+    cursor.execute('''INSERT INTO books(id, title, author, qty)
+                    VALUES(?,?,?,?)''', (id4, title4, author4, qty4))
+    print('Fourth book inserted')
 
-# # Insert book 5
-# cursor.execute('''INSERT INTO books(id, title, author, qty)
-#                   VALUES(?,?,?,?)''', (id5, title5, author5, qty5))
-# print('Fifth book inserted')
+    id5 = 3005
+    title5 = "Alice in Wonderland"
+    author5 = 'Lewis Carrol'
+    qty5 = 12
 
-# db.commit()
+    # Insert book 5
+    cursor.execute('''INSERT INTO books(id, title, author, qty)
+                    VALUES(?,?,?,?)''', (id5, title5, author5, qty5))
+    print('Fifth book inserted')
+
+    db.commit()
+
+except sqlite3.IntegrityError:
+    print("\nThe database is already populated with the initial books in the task\n")
 
 ########################################################################################
 
-# main program logic
+# main program loop
 main_menu()
 
 db.close()
