@@ -1,4 +1,4 @@
 # Bookstore Accounting app
-# # Utilise SQlite, python and userinput to create, read update and delete a simpoe database application
+# # Utilise SQlite, spacy for NLP, python and userinput to create, read update and delete a database management application for a bookstore
 
 
